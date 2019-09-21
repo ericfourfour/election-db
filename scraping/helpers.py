@@ -4,7 +4,8 @@ import urllib.request
 
 
 def download_source(url, path) -> bytes:
-    with urllib.request.urlopen(url) as response:
+    req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+    with urllib.request.urlopen(req) as response:
         with open(path, "wb") as out_file:
             shutil.copyfileobj(response, out_file)
 
