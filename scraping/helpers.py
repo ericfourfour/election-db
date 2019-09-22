@@ -3,8 +3,11 @@ import csv
 import codecs
 import luigi
 import os
+import pathlib as pl
 import shutil
 import urllib.request
+
+from pathlib import Path
 
 
 class DownloadTask(luigi.Task):
@@ -13,6 +16,7 @@ class DownloadTask(luigi.Task):
     user_agent = luigi.Parameter(default="Mozilla/5.0")
 
     def run(self):
+        mk_parent_dirs(self.dst_pth)
         req = urllib.request.Request(
             self.src_url, headers={"User-Agent": self.user_agent}
         )
@@ -32,6 +36,7 @@ class EncodeFileTask(luigi.Task):
     block_size = luigi.IntParameter(default=1048576)
 
     def run(self):
+        mk_parent_dirs(self.dst_pth)
         with codecs.open(self.src_pth, "r", self.src_enc) as src:
             with codecs.open(self.dst_pth, "w", self.dst_enc) as dst:
                 while True:
@@ -63,6 +68,7 @@ class DownloadEncodeTask(luigi.Task):
         )
 
     def run(self):
+        mk_parent_dirs(self.dst_pth)
         EncodeFileTask(
             src_pth=self.tmp_pth,
             dst_pth=self.dst_pth,
@@ -91,6 +97,8 @@ class ScrapeEntities(luigi.Task):
         )
 
     def run(self):
+        mk_parent_dirs(self.dst_pth)
+
         entities = []
         for soup in self.get_soups():
             entities.append(self.parse_entity(soup))
@@ -122,3 +130,8 @@ def download_source(url, path) -> bytes:
 def clean(text: str) -> str:
     return text.replace("\u2009—\u2009", "--").replace("’", "'")
 
+
+def mk_parent_dirs(path: str):
+    p = pl.Path(path)
+    if not p.parent.exists():
+        p.parent.mkdir()
