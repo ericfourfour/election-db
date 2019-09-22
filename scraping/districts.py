@@ -1,46 +1,46 @@
-"""
-Download all of the Federal Electoral Districts and save to CSV
-
-Link: https://www.elections.ca/res/cir/list/ED-Canada_2016.csv
-"""
-
 import codecs
+import csv
+import scraping.helpers as hlp
+import luigi
 import os
 import shutil
 import urllib.request
 
+from luigi.contrib import sqla
+from sqlalchemy import String, Integer
 
-def process(config):
-    file_path = os.path.join(config["folder"], config["filename"])
-    tmp_path = "{}.tmp".format(file_path)
 
-    if os.path.exists(file_path):
-        os.remove(file_path)
+class LoadDistricts(sqla.CopyToTable):
+    src_url = luigi.Parameter(
+        default="https://www.elections.ca/res/cir/list/ED-Canada_2016.csv"
+    )
+    dst_pth = luigi.Parameter(default="data/districts.csv")
 
-    if os.path.exists(tmp_path):
-        os.remove(tmp_path)
+    columns = [
+        (["ed_code", Integer()], {"primary_key": True}),
+        (["ed_namee", String(64)], {}),
+        (["ed_namef", String(64)], {}),
+        (["population", Integer()], {}),
+    ]
+    connection_string = "sqlite:///data/election.db"
+    table = "electoral_districts"
 
-    with urllib.request.urlopen(config["url"]) as response:
-        with open(tmp_path, "wb") as out_file:
-            shutil.copyfileobj(response, out_file)
+    def requires(self):
+        return hlp.DownloadEncodeTask(
+            src_url=self.src_url, dst_pth=self.dst_pth, src_enc="mbcs", dst_enc="utf-8"
+        )
 
-    BLOCKSIZE = 1048576
-    with codecs.open(tmp_path, "r", "mbcs") as sourceFile:
-        with codecs.open(file_path, "w", "utf-8") as targetFile:
-            while True:
-                contents = sourceFile.read(BLOCKSIZE)
-                if not contents:
-                    break
-                targetFile.write(contents)
-
-    os.remove(tmp_path)
+    def rows(self):
+        with open(self.dst_pth, newline="", encoding="utf-8") as csvfile:
+            reader = csv.DictReader(csvfile)
+            for row in reader:
+                yield (
+                    int(row["ED_CODE"]),
+                    row["ED_NAMEE"],
+                    row["ED_NAMEF"],
+                    int(row["POPULATION"]),
+                )
 
 
 if __name__ == "__main__":
-    config = {
-        "url": "https://www.elections.ca/res/cir/list/ED-Canada_2016.csv",
-        "folder": "data",
-        "filename": "districts.csv",
-    }
-
-    process(config)
+    luigi.build([LoadDistricts()], local_scheduler=True)

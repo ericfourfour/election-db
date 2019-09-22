@@ -1,219 +1,285 @@
 import bs4
 import csv
 import datetime as dt
+import luigi
 import os
 import re
-import scraping.helpers as sh
+import scraping.helpers as hlp
 
-config = {
-    "url": "https://www.elections.ca/content.aspx?section=pol&dir=par&document=index&lang=e",
-    "data_folder": "data",
-    "source_file": "parties.html",
-    "dest_file": "parties.csv",
+from luigi.contrib import sqla
+from sqlalchemy import String, Integer
+
+
+COMPILED_RX = {
+    "city_prov_post": re.compile(
+        r"^([\w\- \.']+)(\s+|,\s*)(NL|PE|NS|NB|QC|ON|MB|SK|AB|BC|YT|NT|NU|Newfoundland and Labrador|Prince Edward Island|Nova Scotia|New Brunswick|Quebec|Ontario|Manitoba|Saskatchewan|Alberta|British Columbia|Yukon|Northwest Territories|Nunavut)\s+(\w\d\w\s?\d\w\d)$",
+        re.IGNORECASE,
+    ),
+    "city_prov": re.compile(
+        r"^([\w\- \.']+)(\s+|,\s*)(NL|PE|NS|NB|QC|ON|MB|SK|AB|BC|YT|NT|NU|Newfoundland and Labrador|Prince Edward Island|Nova Scotia|New Brunswick|Quebec|Ontario|Manitoba|Saskatchewan|Alberta|British Columbia|Yukon|Northwest Territories|Nunavut)$",
+        re.IGNORECASE,
+    ),
+    "postal_code": re.compile(r"^(\w\d\w\s?\d\w\d)$", re.IGNORECASE),
+    "po_box": re.compile(r"^P\.?O\.? Box.*$", re.IGNORECASE),
+    "phone_extra": re.compile(r"[\.\-\(\) ]"),
+    "website": re.compile(r"([^\s]+\.(ca|com|info|org))", re.IGNORECASE),
+    "yyyymmdd_hyphen": re.compile(r"\d{4}-\d{2}-\d{2}"),
+    "yyyymmdd_slash": re.compile(r"\d{4}\/\d{2}\/\d{2}"),
 }
 
 
-def download(config: dict):
-    source_path = os.path.join(config["data_folder"], config["source_file"])
-    sh.download_source(config["url"], source_path)
+class ScrapeParties(hlp.ScrapeEntities):
+    src_url = luigi.Parameter(
+        default="https://www.elections.ca/content.aspx?section=pol&dir=par&document=index&lang=e"
+    )
+    src_enc = luigi.Parameter(default="mbcs")
+    local_html = luigi.Parameter(default="data/parties.html")
+    dst_pth = luigi.Parameter(default="data/parties.csv")
 
+    def parse_entity(self, soup: bs4.BeautifulSoup):
+        party = {}
 
-def get_soup(config: dict) -> bs4.BeautifulSoup:
-    source_path = os.path.join(config["data_folder"], config["source_file"])
-    src = open(source_path, encoding="ansi")
-    soup = bs4.BeautifulSoup(src.read(), "html.parser")
-    src.close()
-    return soup
+        title_soup = soup.find("h3", {"class": "partytitle"})
+        title_a_soup = title_soup.find("a")
+        if title_a_soup is not None:
+            party["title"] = title_a_soup.get_text()
+        else:
+            party["title"] = title_soup.get_text()
 
+        logo_soup = soup.find("div", {"class": "logopp"})
+        if logo_soup is not None:
+            logo = logo_soup.find("img")["src"]
+            party["logo"] = "https://www.elections.ca{}".format(logo)
 
-# download(config)
+        website = None
 
-soup = get_soup(config)
-parties_soup = soup.find_all("div", {"class": "borderbox1"})
+        paragraphs = soup.find_all("p")
+        for p in paragraphs:
 
+            # Replace superscript (street directions) with uppercase character
+            for sup in p.findAll("sup"):
+                sup.replaceWith(sup.text.upper())
 
-def get_party(soup: bs4.BeautifulSoup) -> dict:
-    party = {}
+            p = bs4.BeautifulSoup(str(p), "html.parser")
 
-    title = None
-    logo = None
-
-    title_soup = soup.find("h3", {"class": "partytitle"})
-    title_a_soup = title_soup.find("a")
-    if title_a_soup is not None:
-        title = title_a_soup.get_text()
-    else:
-        title = title_soup.get_text()
-
-    logo_soup = soup.find("div", {"class": "logopp"})
-    if logo_soup is not None:
-        logo = logo_soup.find("img")["src"]
-
-    nhq_street_address = None
-    nhq_unit = None
-    nhq_city = None
-    nhq_prov = None
-    nhq_postal_code = None
-
-    registered = None
-    deregistered = None
-
-    ca_unit = None
-    au_unit = None
-
-    nhq_phone = None
-    ca_phone = None
-    au_phone = None
-
-    nhq_fax = None
-    ca_fax = None
-    au_fax = None
-
-    website = None
-
-    dt_rx1 = re.compile(r"\d{4}-\d{2}-\d{2}")
-    dt_rx2 = re.compile(r"\d{4}\/\d{2}\/\d{2}")
-
-    paragraphs = soup.find_all("p")
-    for p in paragraphs:
-        text = p.get_text("\n").replace("\n\n", "\n")
-        parts = list(
-            filter(
-                lambda p: len(p) > 0,
-                map(lambda p: p.replace(":", "").strip(), text.split("\n")),
+            text = p.get_text("\n").replace("\n\n", "\n")
+            parts = list(
+                filter(
+                    lambda p: len(p) > 0,
+                    map(lambda p: p.replace(":", "").strip(), text.split("\n")),
+                )
             )
-        )
-        prop = parts[0].replace(":", "")
+            prop = parts[0].replace(":", "")
 
-        if prop == "Short-form Name":
-            short_name = parts[1]
-        elif prop == "Party Leader":
-            leader = parts[1]
-        elif prop == "National Headquarters":
-            if len(parts) > 3:
-                addr_lines = 2 if parts[3].startswith("Tel") else 3
-            else:
-                addr_lines = 2
+            if prop == "Short-form Name":
+                party["short"] = parts[1]
+            elif prop == "Party Leader":
+                party["leader"] = parts[1]
+            elif prop == "National Headquarters":
+                nhq_contact_info = {
+                    f"nhq_{k}": v for k, v in self.parse_contact_info(parts[1:]).items()
+                }
+            elif prop == "Web site":
+                website = self.parse_website(parts[1])
+            elif prop == "Eligible":
+                eligible = self.parse_date(parts[1])
+                if eligible != None:
+                    party["eligible"] = eligible
+            elif prop == "Registered":
+                registered = self.parse_date(parts[1])
+                if registered != None:
+                    party["registered"] = registered
+            elif prop == "Deregistered":
+                deregistered = self.parse_date(parts[1])
+                if deregistered != None:
+                    party["deregistered"] = deregistered
+            elif prop == "Chief Agent":
+                ca_contact_info = {
+                    f"ca_{k}": v for k, v in self.parse_contact_info(parts[1:]).items()
+                }
+            elif prop == "Auditor":
+                au_contact_info = {
+                    f"au_{k}": v for k, v in self.parse_contact_info(parts[1:]).items()
+                }
 
-            if addr_lines == 3:
-                if parts[1].replace(".", "").startswith("PO Box"):
-                    nhw_street_address = parts[2]
-                    nhq_unit = parts[1]
+        party = {**party, **nhq_contact_info}
+        party = {**party, **ca_contact_info}
+        party = {**party, **au_contact_info}
+        if "nhq_website" not in party and website is not None:
+            party["nhq_website"] = website
+
+        if "nhq_website" in party:
+            party["website"] = party.pop("nhq_website")
+
+        return party
+
+    def get_soups(self):
+        with open(self.local_html, "r", encoding="utf-8") as f:
+            html = f.read()
+        soup = bs4.BeautifulSoup(html, "html.parser")
+        entities = soup.find_all("div", {"class": "borderbox1"})
+        for entity in entities:
+            yield entity
+
+    def parse_contact_info(self, parts: list) -> dict:
+        contact_info = {}
+
+        addr_type = None
+        n_addr_lines = None
+        for i in range(len(parts)):
+            if COMPILED_RX["city_prov_post"].match(parts[i]):
+                n_addr_lines = i + 1
+                addr_type = "city prov post"
+
+        if n_addr_lines == None:
+            for i in range(len(parts)):
+                if COMPILED_RX["postal_code"].match(parts[i]):
+                    n_addr_lines = i + 1
+                    addr_type = "city prov / post"
+
+        if addr_type == None:
+            raise Exception("Unkown Address Type")
+
+        addr_lines = parts[:n_addr_lines]
+
+        for i, line in enumerate(addr_lines):
+            contact_info["address_line_{}".format(i + 1)] = line
+
+        if addr_type == "city prov post":
+            addr_capture = re.search(COMPILED_RX["city_prov_post"], addr_lines[-1])
+
+            contact_info["city"] = addr_capture.group(1)
+            contact_info["prov"] = addr_capture.group(3)
+            contact_info["postal_code"] = addr_capture.group(4).replace(" ", "")
+
+        elif addr_type == "city prov / post":
+            addr_capture = re.search(COMPILED_RX["city_prov"], addr_lines[-2])
+
+            contact_info["city"] = addr_capture.group(1)
+            contact_info["prov"] = addr_capture.group(3)
+            contact_info["postal_code"] = addr_lines[-1].replace(" ", "")
+
+        more_lines = parts[n_addr_lines:]
+
+        for line in more_lines:
+            if line.startswith("Tel"):
+                phone = self.parse_phone_number(line.replace("Tel", ""))
+                if phone.startswith("/Fax") or phone.startswith("Fax"):
+                    phone = self.parse_phone_number(
+                        phone.replace("/Fax", "").replace("Fax", "")
+                    )
+                    contact_info["phone"] = phone
+                    contact_info["fax"] = phone
                 else:
-                    nhq_street_address = parts[1]
-                    nhq_unit = parts[2]
-            else:
-                nhq_street_address = parts[1]
+                    contact_info["phone"] = phone
+            elif line.startswith("Fax"):
+                contact_info["fax"] = self.parse_phone_number(line.replace("Fax", ""))
+            elif COMPILED_RX["website"].match(line):
+                contact_info["website"] = self.parse_website(line)
+        return contact_info
 
-            nhq_city = parts[addr_lines][:-11].strip()
-            nhq_prov = parts[addr_lines][-11:-8].strip()
-            nhq_postal_code = parts[addr_lines][-7:].replace(" ", "")
+    def parse_phone_number(self, raw_phone: str) -> str:
+        return re.sub(COMPILED_RX["phone_extra"], "", raw_phone).strip()
 
-            if len(parts) - 1 >= addr_lines + 1:
-                nhq_phone = parts[addr_lines + 1].replace("Tel.", "").strip()
-            if len(parts) - 1 >= addr_lines + 2:
-                nhq_fax = parts[addr_lines + 2].replace("Fax", "").strip()
-            website_soup = p.find("a")
-            if website_soup is not None:
-                website = website_soup["href"]
-        elif prop == "Eligible":
-            if dt_rx1.match(parts[1]):
-                eligible = dt.datetime.strptime(parts[1], "%Y-%m-%d").date()
-            elif dt_rx2.match(parts[1]):
-                eligible = dt.datetime.strptime(parts[1], "%Y/%m/%d").date()
-        elif prop == "Registered":
-            if dt_rx1.match(parts[1]):
-                registered = dt.datetime.strptime(parts[1], "%Y-%m-%d").date()
-            elif dt_rx2.match(parts[1]):
-                registered = dt.datetime.strptime(parts[1], "%Y/%m/%d").date()
-        elif prop == "Deregistered":
-            if dt_rx1.match(parts[1]):
-                deregistered = dt.datetime.strptime(parts[1], "%Y-%m-%d").date()
-            elif dt_rx2.match(parts[1]):
-                deregistered = dt.datetime.strptime(parts[1], "%Y/%m/%d").date()
-        elif prop == "Chief Agent":
-            addr_lines = 2 if parts[4].startswith("Tel") else 3
+    def parse_website(self, raw_site: str) -> str:
+        capture = re.search(COMPILED_RX["website"], raw_site)
+        website = capture.group(1)
+        website = website.replace("https//", "https://").replace("http//", "http://")
+        return website
 
-            ca_name = parts[1]
+    def parse_date(self, raw_date: str) -> dt.date:
+        fmt = None
+        if COMPILED_RX["yyyymmdd_hyphen"].match(raw_date):
+            fmt = "%Y-%m-%d"
+        elif COMPILED_RX["yyyymmdd_slash"].match(raw_date):
+            fmt = "%Y/%m/%d"
+        else:
+            return None
 
-            ca_street_address = parts[2]
-            if addr_lines == 3:
-                ca_unit = parts[3]
-
-            ca_city = parts[addr_lines + 1][:-11].strip()
-            ca_prov = parts[addr_lines + 1][-11:-8].strip()
-            ca_postal_code = parts[addr_lines + 1][-7:].replace(" ", "").strip()
-
-            if len(parts) - 1 >= addr_lines + 2:
-                ca_phone = parts[addr_lines + 2].replace("Tel.", "").strip()
-            if len(parts) - 1 >= addr_lines + 3:
-                ca_fax = parts[addr_lines + 3].replace("Fax", "").strip()
-        elif prop == "Auditor":
-            addr_lines = 2 if parts[4].startswith("Tel") else 3
-
-            au_name = parts[1]
-            au_street_address = parts[2]
-            if addr_lines == 3:
-                au_unit = parts[3]
-
-            au_city = parts[addr_lines + 1][:-11].strip()
-            au_prov = parts[addr_lines + 1][-11:-8].strip()
-            au_postal_code = parts[addr_lines + 1][-7:].replace(" ", "")
-
-            if len(parts) - 1 >= addr_lines + 2:
-                au_phone = parts[addr_lines + 2].replace("Tel.", "").strip()
-            if len(parts) - 1 >= addr_lines + 3:
-                au_fax = parts[addr_lines + 3].replace("Fax", "").strip()
-
-    party["title"] = title
-    party["logo"] = "https://www.elections.ca{}".format(logo)
-    party["short"] = short_name
-    party["leader"] = leader
-    party["nhq_street_address"] = nhq_street_address
-    party["nhq_unit"] = nhq_unit
-    party["nhq_city"] = nhq_city
-    party["nhq_prov"] = nhq_prov
-    party["nhq_postal_code"] = nhq_postal_code
-    party["nhq_phone"] = nhq_phone
-    party["nhq_fax"] = nhq_fax
-    party["website"] = website
-    party["eligible"] = eligible
-    party["registered"] = registered
-    party["deregistered"] = deregistered
-    party["ca_name"] = ca_name
-    party["ca_street_address"] = ca_street_address
-    party["ca_unit"] = ca_unit
-    party["ca_city"] = ca_city
-    party["ca_prov"] = ca_prov
-    party["ca_postal_code"] = ca_postal_code
-    party["ca_phone"] = ca_phone
-    party["ca_fax"] = ca_fax
-    party["au_name"] = au_name
-    party["au_street_address"] = au_street_address
-    party["au_unit"] = au_unit
-    party["au_city"] = au_city
-    party["au_prov"] = au_prov
-    party["au_postal_code"] = au_postal_code
-    party["au_phone"] = au_phone
-    party["au_fax"] = au_fax
-
-    return party
+        return dt.datetime.strptime(raw_date, fmt).date()
 
 
-def save_parties(config: dict, parties: list):
-    dest_path = os.path.join(config["data_folder"], config["dest_file"])
+class LoadParties(sqla.CopyToTable):
+    src_pth = luigi.Parameter(default="data/parties.csv")
 
-    keys = set().union(*(d.keys() for d in parties))
-    with open(dest_path, "w", encoding="utf8", newline="") as output_file:
-        dict_writer = csv.DictWriter(output_file, keys)
-        dict_writer.writeheader()
-        dict_writer.writerows(parties)
+    columns = [
+        (["title", String(100)], {"primary_key": True}),
+        (["short_name", String(64)], {}),
+        (["eligible_dt", String(10)], {}),
+        (["registered_dt", String(10)], {}),
+        (["deregistered_dt", String(10)], {}),
+        (["leader", String(64)], {}),
+        (["logo", String(250)], {}),
+        (["website", String(250)], {}),
+        (["national_hq_unit", String(64)], {}),
+        (["national_hq_street_address", String(100)], {}),
+        (["national_hq_city", String(64)], {}),
+        (["national_hq_prov", String(2)], {}),
+        (["national_hq_postal_code", String(6)], {}),
+        (["national_hq_phone", String(20)], {}),
+        (["national_hq_fax", String(20)], {}),
+        (["chief_agent_name", String(64)], {}),
+        (["chief_agent_unit", String(64)], {}),
+        (["chief_agent_street_address", String(100)], {}),
+        (["chief_agent_city", String(64)], {}),
+        (["chief_agent_prov", String(2)], {}),
+        (["chief_agent_postal_code", String(6)], {}),
+        (["chief_agent_phone", String(20)], {}),
+        (["chief_agent_fax", String(20)], {}),
+        (["auditor_name", String(64)], {}),
+        (["auditor_unit", String(64)], {}),
+        (["auditor_street_address", String(100)], {}),
+        (["auditor_city", String(64)], {}),
+        (["auditor_prov", String(2)], {}),
+        (["auditor_postal_code", String(6)], {}),
+        (["auditor_phone", String(20)], {}),
+        (["auditor_fax", String(20)], {}),
+    ]
+    connection_string = "sqlite:///data/election.db"
+    table = "parties"
+
+    def requires(self):
+        return ScrapeParties()
+
+    def rows(self):
+        with open(self.src_pth, newline="", encoding="utf-8") as csvfile:
+            reader = csv.DictReader(csvfile)
+            for row in reader:
+                yield (
+                    row["title"],
+                    row["short"],
+                    row["eligible"],
+                    row["registered"],
+                    row["deregistered"],
+                    row["leader"],
+                    row["logo"],
+                    row["website"],
+                    row["nhq_unit"],
+                    row["nhq_street_address"],
+                    row["nhq_city"],
+                    row["nhq_prov"],
+                    row["nhq_postal_code"],
+                    row["nhq_phone"],
+                    row["nhq_fax"],
+                    row["ca_name"],
+                    row["ca_unit"],
+                    row["ca_street_address"],
+                    row["ca_city"],
+                    row["ca_prov"],
+                    row["ca_postal_code"],
+                    row["ca_phone"],
+                    row["ca_fax"],
+                    row["au_name"],
+                    row["au_unit"],
+                    row["au_street_address"],
+                    row["au_city"],
+                    row["au_prov"],
+                    row["au_postal_code"],
+                    row["au_phone"],
+                    row["au_fax"],
+                )
 
 
-parties = []
-for party_soup in parties_soup:
-    party = get_party(party_soup)
-    parties.append(party)
-
-save_parties(config, parties)
-
+if __name__ == "__main__":
+    luigi.build([ScrapeParties()], local_scheduler=True)
+    # luigi.build([LoadParties()], local_scheduler=True)
