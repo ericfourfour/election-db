@@ -87,6 +87,7 @@ class ScrapeEntities(luigi.Task):
     src_enc = luigi.Parameter(default="utf-8")
     local_html = luigi.Parameter()
     dst_pth = luigi.Parameter()
+    mode = luigi.Parameter(default="w")
 
     def requires(self):
         return DownloadEncodeTask(
@@ -105,9 +106,16 @@ class ScrapeEntities(luigi.Task):
 
         headers = list(set().union(*(d.keys() for d in entities)))
         headers.sort()
-        with open(self.output().path, "w", encoding="utf-8", newline="") as output_file:
+        with open(
+            self.output().path, self.mode, encoding="utf-8", newline=""
+        ) as output_file:
             dict_writer = csv.DictWriter(output_file, headers)
-            dict_writer.writeheader()
+            if self.mode == "w":
+                dict_writer.writeheader()
+            elif self.mode == "a":
+                output_file.seek(0, 2)
+                if output_file.tell() == 0:
+                    dict_writer.writeheader()
             dict_writer.writerows(entities)
 
     def output(self):
