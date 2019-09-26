@@ -68,7 +68,7 @@ class Party(scrapy.Item):
     )
 
 
-def clean_photo(photo: str) -> str:
+def clean_lpc_photo(photo: str) -> str:
     return photo[4:-1]
 
 
@@ -80,5 +80,37 @@ class LPCCandidate(scrapy.Item):
     facebook = scrapy.Field(input_processor=TakeFirst())
     instagram = scrapy.Field(input_processor=TakeFirst())
     website = scrapy.Field(input_processor=TakeFirst())
-    photo = scrapy.Field(input_processor=MapCompose(clean_photo))
+    photo = scrapy.Field(input_processor=MapCompose(clean_lpc_photo))
+    bio = scrapy.Field(input_processor=MapCompose(strip_remove_blanks))
+
+
+def clean_cpc_nomination_dt(value: str) -> str:
+    return value.replace("Nomination Date: ", "")
+
+
+def clean_cpc_riding(value: str) -> str:
+    value = (
+        value.replace("\u2009", "")
+        .replace("’", "'")
+        .replace("—", "-")
+        .replace("–", "-")
+        .strip()
+    )
+    if value == "Vancouver--Sunshine Coast--Sea to Sky Country":
+        value = "West Vancouver--Sunshine Coast--Sea to Sky Country"
+    return value
+
+
+class CPCCandidate(scrapy.Item):
+    name = scrapy.Field()
+    riding = scrapy.Field(input_processor=MapCompose(clean_cpc_riding))
+    nomination_dt = scrapy.Field(input_processor=MapCompose(clean_cpc_nomination_dt))
+    cabinet_position = scrapy.Field()
+    photo = scrapy.Field()
+    donate = scrapy.Field()
+    website = scrapy.Field()
+    facebook = scrapy.Field()
+    instagram = scrapy.Field()
+    twitter = scrapy.Field()
+    phone = scrapy.Field()
     bio = scrapy.Field(input_processor=MapCompose(strip_remove_blanks))
