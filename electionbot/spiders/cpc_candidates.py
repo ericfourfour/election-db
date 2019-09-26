@@ -9,8 +9,6 @@ class CPCCandidateSpider(scrapy.Spider):
 
     def parse(self, response):
         for sel in response.xpath("//div[@class='cabinet-member']"):
-            l = ItemLoader(item=ei.LPCCandidate(), selector=sel)
-
             riding = sel.xpath(".//p[@class='riding-title']//text()").extract_first()
             more_link = sel.xpath(".//a[text()='Learn More']//@href").get()
 
