@@ -12,6 +12,13 @@ def resolve_relative_url(value: str) -> str:
     return f"https://www.elections.ca{value}"
 
 
+def strip_remove_blanks(value: str) -> str:
+    value = value.strip()
+    if value == "":
+        return None
+    return value
+
+
 def cleanse_address(value: str) -> str:
     if (
         value.strip().endswith(":")
@@ -59,3 +66,19 @@ class Party(scrapy.Item):
         input_processor=MapCompose(cleanse_address, clean_field, str.strip),
         output_processor=Join("|"),
     )
+
+
+def clean_photo(photo: str) -> str:
+    return photo[4:-1]
+
+
+class LPCCandidate(scrapy.Item):
+    name = scrapy.Field()
+    ed_code = scrapy.Field()
+    donate = scrapy.Field(input_processor=TakeFirst())
+    twitter = scrapy.Field(input_processor=TakeFirst())
+    facebook = scrapy.Field(input_processor=TakeFirst())
+    instagram = scrapy.Field(input_processor=TakeFirst())
+    website = scrapy.Field(input_processor=TakeFirst())
+    photo = scrapy.Field(input_processor=MapCompose(clean_photo))
+    bio = scrapy.Field(input_processor=MapCompose(strip_remove_blanks))

@@ -3,3 +3,4 @@ data/
 *.pyc
 .scrapy/
 items.json
+lpc_candidates.json

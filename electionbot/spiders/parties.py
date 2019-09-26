@@ -10,10 +10,6 @@ class PartySpider(scrapy.Spider):
     ]
 
     def parse(self, response):
-        l = ItemLoader(item=ei.Party(), response=response)
-
-        # "div", {"class": "borderbox1"
-
         for sel in response.xpath('//div[@class="borderbox1"]'):
             l = ItemLoader(item=ei.Party(), selector=sel)
             l.add_xpath("title", ".//h3//text()")
@@ -26,7 +22,8 @@ class PartySpider(scrapy.Spider):
                 "registered_dt", ".//p[contains(span[1]/text(), 'Register')]//text()"
             )
             l.add_xpath(
-                "deregistered_dt", ".//p[contains(span[1]/text(), 'Deregister')]//text()"
+                "deregistered_dt",
+                ".//p[contains(span[1]/text(), 'Deregister')]//text()",
             )
             l.add_xpath("website", "./h3/a/@href")
             l.add_xpath("logo", './/div[@class="logopp"]/img/@src')
