@@ -188,3 +188,11 @@ class NDPCandidate(scrapy.Item):
     instagram = scrapy.Field()
     twitter = scrapy.Field()
     bio = scrapy.Field()
+
+
+class PPCCandidate(scrapy.Item):
+    name = scrapy.Field()
+    riding = scrapy.Field()
+    website = scrapy.Field()
+    facebook = scrapy.Field()
+    twitter = scrapy.Field()
