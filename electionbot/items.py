@@ -16,6 +16,10 @@ def clean_phone(value: str) -> str:
     )
 
 
+def clean_mailto(value: str) -> str:
+    return value.replace("mailto:", "")
+
+
 def clean_field(value: str) -> str:
     return value.replace(":", "")
 
@@ -196,3 +200,31 @@ class PPCCandidate(scrapy.Item):
     website = scrapy.Field()
     facebook = scrapy.Field()
     twitter = scrapy.Field()
+
+
+def clean_gpc_ed_code(value: str) -> str:
+    return value.replace("#rid-", "")
+
+
+def prepend_gpc_link(value: str) -> str:
+    return f"https://www.greenparty.ca{value}"
+
+
+def clean_gpc_email(value: str) -> str:
+    if not "@" in value:
+        return None
+    return value.strip()
+
+
+class GPCCandidate(scrapy.Item):
+    name = scrapy.Field()
+    ed_code = scrapy.Field(input_processor=MapCompose(clean_gpc_ed_code))
+    photo = scrapy.Field()
+    volunteer = scrapy.Field(input_processor=MapCompose(prepend_gpc_link))
+    donate = scrapy.Field(input_processor=MapCompose(prepend_gpc_link))
+    facebook = scrapy.Field()
+    instagram = scrapy.Field()
+    twitter = scrapy.Field()
+    email = scrapy.Field(input_processor=MapCompose(clean_mailto))
+    phone = scrapy.Field(input_processor=MapCompose(clean_phone))
+    bio = scrapy.Field(input_processor=MapCompose(strip_remove_blanks))
