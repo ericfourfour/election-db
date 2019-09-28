@@ -56,20 +56,31 @@ def cleanse_date(value: str) -> str:
 
 
 class Party(scrapy.Item):
-    title = scrapy.Field(input_processor=MapCompose(str.strip))
-    short_name = scrapy.Field(input_processor=MapCompose(clean_field, str.strip))
+    title = scrapy.Field(
+        input_processor=MapCompose(str.strip), output_processor=TakeFirst()
+    )
+    short_name = scrapy.Field(
+        input_processor=MapCompose(clean_field, str.strip), output_processor=TakeFirst()
+    )
     eligible_dt = scrapy.Field(
-        input_processor=MapCompose(clean_field, cleanse_date, str.strip)
+        input_processor=MapCompose(clean_field, cleanse_date, str.strip),
+        output_processor=TakeFirst(),
     )
     registered_dt = scrapy.Field(
-        input_processor=MapCompose(clean_field, cleanse_date, str.strip)
+        input_processor=MapCompose(clean_field, cleanse_date, str.strip),
+        output_processor=TakeFirst(),
     )
     deregistered_dt = scrapy.Field(
-        input_processor=MapCompose(clean_field, cleanse_date, str.strip)
+        input_processor=MapCompose(clean_field, cleanse_date, str.strip),
+        output_processor=TakeFirst(),
     )
-    leader = scrapy.Field(input_processor=MapCompose(clean_field, str.strip))
-    logo = scrapy.Field(input_processor=MapCompose(resolve_relative_url))
-    website = scrapy.Field()
+    leader = scrapy.Field(
+        input_processor=MapCompose(clean_field, str.strip), output_processor=TakeFirst()
+    )
+    logo = scrapy.Field(
+        input_processor=MapCompose(resolve_relative_url), output_processor=TakeFirst()
+    )
+    website = scrapy.Field(output_processor=TakeFirst())
     national_headquarters = scrapy.Field(
         input_processor=MapCompose(cleanse_address, clean_field, str.strip),
         output_processor=Join("|"),
@@ -121,7 +132,7 @@ class CPCCandidate(scrapy.Item):
     name = scrapy.Field()
     riding = scrapy.Field(input_processor=MapCompose(clean_cpc_riding))
     nomination_dt = scrapy.Field(input_processor=MapCompose(clean_cpc_nomination_dt))
-    cabinet_position = scrapy.Field()
+    cabinet_position = scrapy.Field(input_processor=MapCompose(strip_remove_blanks))
     photo = scrapy.Field()
     donate = scrapy.Field()
     website = scrapy.Field()
@@ -182,16 +193,16 @@ def prepend_ndp_link(value: str) -> str:
 class NDPCandidate(scrapy.Item):
     name = scrapy.Field(input_processor=MapCompose(clean_ndp_name))
     ed_code = scrapy.Field()
-    cabinet_position = scrapy.Field()
+    cabinet_position = scrapy.Field(input_processor=MapCompose(strip_remove_blanks))
     photo = scrapy.Field()
     donate = scrapy.Field(input_processor=MapCompose(prepend_ndp_link))
     lawnsign = scrapy.Field(input_processor=MapCompose(prepend_ndp_link))
     volunteer = scrapy.Field()
-    website = scrapy.Field()
-    facebook = scrapy.Field()
-    instagram = scrapy.Field()
-    twitter = scrapy.Field()
-    bio = scrapy.Field()
+    website = scrapy.Field(input_processor=MapCompose(strip_remove_blanks))
+    facebook = scrapy.Field(input_processor=MapCompose(strip_remove_blanks))
+    instagram = scrapy.Field(input_processor=MapCompose(strip_remove_blanks))
+    twitter = scrapy.Field(input_processor=MapCompose(strip_remove_blanks))
+    bio = scrapy.Field(input_processor=MapCompose(strip_remove_blanks))
 
 
 class PPCCandidate(scrapy.Item):

@@ -6,6 +6,10 @@ import shutil
 import urllib
 
 
+def try_get_first(d: dict, key: str):
+    return d[key][0] if key in d else None
+
+
 def mk_parent_dirs(path: str):
     p = pathlib.Path(path)
     if not p.parent.exists():

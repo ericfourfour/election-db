@@ -8,9 +8,9 @@ CREATE TABLE electoral_districts (
 CREATE TABLE parties (
       title TEXT PRIMARY KEY
     , short_name TEXT
-    , eligible_dt INTEGER
-    , registered_dt INTEGER
-    , deregistered_dt INTEGER
+    , eligible_dt TEXT
+    , registered_dt TEXT
+    , deregistered_dt TEXT
     , leader TEXT
     , logo TEXT
     , website TEXT
