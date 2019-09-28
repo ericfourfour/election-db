@@ -1,8 +1,12 @@
 import codecs
+import json
 import luigi
 import os
+import pandas as pd
 import pathlib
+import re
 import shutil
+import sqlite3
 import urllib
 
 
@@ -86,3 +90,38 @@ class DownloadEncodeTask(luigi.Task):
 
     def output(self):
         return luigi.LocalTarget(self.dst_pth)
+
+
+class LookupEDCodes(luigi.Task):
+    src_pth = luigi.Parameter()
+    dst_pth = luigi.Parameter()
+
+    connection_string = "sqlite:///data/db/election.db"
+
+    def run(self):
+        mk_parent_dirs(self.dst_pth)
+
+        with sqlite3.connect(self.connection_string.replace("sqlite:///", "")) as db:
+            districts = pd.read_sql_query("SELECT * FROM electoral_districts", db)
+
+        districts["riding"] = districts["ed_namee"].apply(
+            lambda x: re.sub(r"[^A-Za-z]+", "", x).lower()
+        )
+        districts.set_index("riding", inplace=True)
+        districts = districts[["ed_code"]].astype("str")
+
+        candidates = pd.read_json(self.src_pth)
+        candidates["riding"] = candidates["riding"].apply(
+            lambda x: re.sub(r"[^A-Za-z]+", "", x).lower()
+        )
+        candidates.set_index("riding", inplace=True)
+
+        candidates = candidates.join(districts)
+
+        candidates.to_json(self.dst_pth, orient="records")
+
+    def complete(self):
+        if not os.path.exists(self.dst_pth):
+            return False
+        candidates = pd.read_json(self.dst_pth)
+        return "ed_code" in candidates.columns

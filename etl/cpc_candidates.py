@@ -1,28 +1,33 @@
+import etl.helpers as hlp
 import json
 import luigi
 
 from luigi.contrib import sqla
 
 
-class LoadLPCCandidates(sqla.CopyToTable):
-    src_pth = "data/lpc_candidates.json"
+class LoadCPCCandidates(sqla.CopyToTable):
+    src_pth = "data/cpc_candidates.json"
+    ed_pth = "data/cpc_candidates_ed.json"
 
     reflect = True
     connection_string = "sqlite:///data/db/election.db"
     table = "candidates"
 
+    def requires(self):
+        return hlp.LookupEDCodes(src_pth=self.src_pth, dst_pth=self.ed_pth)
+
     def rows(self):
-        with open(self.src_pth, newline="", encoding="utf-8") as json_file:
+        with open(self.ed_pth, newline="", encoding="utf-8") as json_file:
             data = json.load(json_file)
             for row in data:
                 yield (
                     row.get("ed_code"),
-                    "Liberal Party of Canada",
+                    "Conservative Party of Canada",
                     row.get("name"),
+                    row.get("nomination_dt"),
+                    row.get("cabinate_position"),
                     None,
-                    None,
-                    None,
-                    None,
+                    row.get("phone"),
                     row.get("photo"),
                     row.get("donate"),
                     None,
@@ -36,4 +41,4 @@ class LoadLPCCandidates(sqla.CopyToTable):
 
 
 if __name__ == "__main__":
-    luigi.build([LoadCandidates()], local_scheduler=True)
+    luigi.build([LoadCPCCandidates()], local_scheduler=True)

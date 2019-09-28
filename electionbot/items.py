@@ -127,24 +127,35 @@ def clean_cpc_riding(value: str) -> str:
         .replace("–", "-")
         .strip()
     )
-    if value == "Vancouver--Sunshine Coast--Sea to Sky Country":
-        value = "West Vancouver--Sunshine Coast--Sea to Sky Country"
+    if value == "Vancouver-Sunshine Coast-Sea to Sky Country":
+        value = "West Vancouver-Sunshine Coast-Sea to Sky Country"
+    if value == "Jonquière-Haut-Saguenay":
+        value = "Jonquière"
     return value
 
 
 class CPCCandidate(scrapy.Item):
-    name = scrapy.Field()
-    riding = scrapy.Field(input_processor=MapCompose(clean_cpc_riding))
-    nomination_dt = scrapy.Field(input_processor=MapCompose(clean_cpc_nomination_dt))
-    cabinet_position = scrapy.Field(input_processor=MapCompose(strip_remove_blanks))
-    photo = scrapy.Field()
-    donate = scrapy.Field()
-    website = scrapy.Field()
-    facebook = scrapy.Field()
-    instagram = scrapy.Field()
-    twitter = scrapy.Field()
-    phone = scrapy.Field()
-    bio = scrapy.Field(input_processor=MapCompose(strip_remove_blanks))
+    name = scrapy.Field(output_processor=TakeFirst())
+    riding = scrapy.Field(
+        input_processor=MapCompose(clean_cpc_riding), output_processor=TakeFirst()
+    )
+    nomination_dt = scrapy.Field(
+        input_processor=MapCompose(clean_cpc_nomination_dt),
+        output_processor=TakeFirst(),
+    )
+    cabinet_position = scrapy.Field(
+        input_processor=MapCompose(strip_remove_blanks), output_processor=TakeFirst()
+    )
+    photo = scrapy.Field(output_processor=TakeFirst())
+    donate = scrapy.Field(output_processor=TakeFirst())
+    website = scrapy.Field(output_processor=TakeFirst())
+    facebook = scrapy.Field(output_processor=TakeFirst())
+    instagram = scrapy.Field(output_processor=TakeFirst())
+    twitter = scrapy.Field(output_processor=TakeFirst())
+    phone = scrapy.Field(output_processor=TakeFirst())
+    bio = scrapy.Field(
+        input_processor=MapCompose(strip_remove_blanks), output_processor=Join("\n")
+    )
 
 
 def parse_bq_name(value: str) -> str:
