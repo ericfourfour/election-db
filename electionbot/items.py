@@ -209,22 +209,42 @@ def clean_ndp_name(value: str) -> str:
 
 
 def prepend_ndp_link(value: str) -> str:
-    return f"https://www.ndp.ca{value}"
+    return f"https://www.ndp.ca{value}" if not value.startswith("https://") else value
 
 
 class NDPCandidate(scrapy.Item):
-    name = scrapy.Field(input_processor=MapCompose(clean_ndp_name))
-    ed_code = scrapy.Field()
-    cabinet_position = scrapy.Field(input_processor=MapCompose(strip_remove_blanks))
-    photo = scrapy.Field()
-    donate = scrapy.Field(input_processor=MapCompose(prepend_ndp_link))
-    lawnsign = scrapy.Field(input_processor=MapCompose(prepend_ndp_link))
-    volunteer = scrapy.Field()
-    website = scrapy.Field(input_processor=MapCompose(strip_remove_blanks))
-    facebook = scrapy.Field(input_processor=MapCompose(strip_remove_blanks))
-    instagram = scrapy.Field(input_processor=MapCompose(strip_remove_blanks))
-    twitter = scrapy.Field(input_processor=MapCompose(strip_remove_blanks))
-    bio = scrapy.Field(input_processor=MapCompose(strip_remove_blanks))
+    name = scrapy.Field(
+        input_processor=MapCompose(clean_ndp_name), output_processor=TakeFirst()
+    )
+    ed_code = scrapy.Field(output_processor=TakeFirst())
+    cabinet_position = scrapy.Field(
+        input_processor=MapCompose(strip_remove_blanks), output_processor=TakeFirst()
+    )
+    photo = scrapy.Field(
+        input_processor=MapCompose(prepend_ndp_link), output_processor=TakeFirst()
+    )
+    donate = scrapy.Field(
+        input_processor=MapCompose(prepend_ndp_link), output_processor=TakeFirst()
+    )
+    lawnsign = scrapy.Field(
+        input_processor=MapCompose(prepend_ndp_link), output_processor=TakeFirst()
+    )
+    volunteer = scrapy.Field(output_processor=TakeFirst())
+    website = scrapy.Field(
+        input_processor=MapCompose(strip_remove_blanks), output_processor=TakeFirst()
+    )
+    facebook = scrapy.Field(
+        input_processor=MapCompose(strip_remove_blanks), output_processor=TakeFirst()
+    )
+    instagram = scrapy.Field(
+        input_processor=MapCompose(strip_remove_blanks), output_processor=TakeFirst()
+    )
+    twitter = scrapy.Field(
+        input_processor=MapCompose(strip_remove_blanks), output_processor=TakeFirst()
+    )
+    bio = scrapy.Field(
+        input_processor=MapCompose(strip_remove_blanks), output_processor=Join("\n")
+    )
 
 
 class PPCCandidate(scrapy.Item):

@@ -4,8 +4,8 @@ import luigi
 from luigi.contrib import sqla
 
 
-class LoadLPCCandidates(sqla.CopyToTable):
-    src_pth = "data/lpc_candidates.json"
+class LoadNDPCandidates(sqla.CopyToTable):
+    src_pth = "data/ndp_candidates.json"
 
     reflect = True
     connection_string = "sqlite:///data/db/election.db"
@@ -17,16 +17,16 @@ class LoadLPCCandidates(sqla.CopyToTable):
             for row in data:
                 yield (
                     row.get("ed_code"),
-                    "Liberal Party of Canada",
+                    "New Democratic Party",
                     row.get("name"),
                     None,
-                    None,
+                    row.get("cabinet_position"),
                     None,
                     None,
                     row.get("photo"),
                     row.get("donate"),
-                    None,
-                    None,
+                    row.get("volunteer"),
+                    row.get("lawnsign"),
                     row.get("website"),
                     row.get("facebook"),
                     row.get("instagram"),
@@ -36,4 +36,4 @@ class LoadLPCCandidates(sqla.CopyToTable):
 
 
 if __name__ == "__main__":
-    luigi.build([LoadLPCCandidates()], local_scheduler=True)
+    luigi.build([LoadNDPCandidates()], local_scheduler=True)
