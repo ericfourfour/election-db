@@ -100,15 +100,19 @@ def clean_lpc_photo(photo: str) -> str:
 
 
 class LPCCandidate(scrapy.Item):
-    name = scrapy.Field()
-    ed_code = scrapy.Field()
-    donate = scrapy.Field(input_processor=TakeFirst())
-    twitter = scrapy.Field(input_processor=TakeFirst())
-    facebook = scrapy.Field(input_processor=TakeFirst())
-    instagram = scrapy.Field(input_processor=TakeFirst())
-    website = scrapy.Field(input_processor=TakeFirst())
-    photo = scrapy.Field(input_processor=MapCompose(clean_lpc_photo))
-    bio = scrapy.Field(input_processor=MapCompose(strip_remove_blanks))
+    name = scrapy.Field(output_processor=TakeFirst())
+    ed_code = scrapy.Field(output_processor=TakeFirst())
+    donate = scrapy.Field(output_processor=TakeFirst())
+    twitter = scrapy.Field(output_processor=TakeFirst())
+    facebook = scrapy.Field(output_processor=TakeFirst())
+    instagram = scrapy.Field(output_processor=TakeFirst())
+    website = scrapy.Field(output_processor=TakeFirst())
+    photo = scrapy.Field(
+        input_processor=MapCompose(clean_lpc_photo), output_processor=TakeFirst()
+    )
+    bio = scrapy.Field(
+        input_processor=MapCompose(strip_remove_blanks), output_processor=Join("\n")
+    )
 
 
 def clean_cpc_nomination_dt(value: str) -> str:
