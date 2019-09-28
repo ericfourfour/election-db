@@ -1,13 +1,12 @@
 CREATE TABLE electoral_districts (
-      ed_code INTEGER
+      ed_code INTEGER PRIMARY KEY
     , ed_namee TEXT
     , ed_namef TEXT
     , population INTEGER
-    PRIMARY KEY (ed_code)
 );
 
 CREATE TABLE parties (
-      title TEXT
+      title TEXT PRIMARY KEY
     , short_name TEXT
     , eligible_dt INTEGER
     , registered_dt INTEGER
@@ -18,13 +17,12 @@ CREATE TABLE parties (
     , national_headquarters TEXT
     , chief_agent TEXT
     , auditor TEXT
-    PRIMARY KEY (title)
 );
 
 CREATE TABLE candidates (
-	  name TEXT
-	, ed_code INTEGER
+	  ed_code INTEGER
 	, party_title TEXT
+	, name TEXT
 	, nomination_dt TEXT
 	, cabinet_position TEXT
 	, email TEXT
@@ -38,7 +36,7 @@ CREATE TABLE candidates (
 	, instagram TEXT
 	, twitter TEXT
 	, bio TEXT
-	, PRIMARY KEY (name)
+	, PRIMARY KEY (ed_code, party_title)
 	, FOREIGN KEY (ed_code) REFERENCES electoral_districts(ed_code)
 	, FOREIGN KEY (party_title) REFERENCES parties(title)
 );
