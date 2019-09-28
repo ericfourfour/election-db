@@ -9,7 +9,7 @@ class PPCCandidateSpider(scrapy.Spider):
 
     def parse(self, response):
         for sel in response.xpath(
-            "//table[@class='candidatetable']/tbody/tr[td[string-length(text()) > 1][2]]"
+            "//table[@class='candidatetable']/tbody/tr[td[2][string-length(normalize-space(text())) > 5]]"
         ):
             l = ItemLoader(item=ei.PPCCandidate(), selector=sel)
 

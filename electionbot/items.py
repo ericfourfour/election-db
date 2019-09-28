@@ -248,11 +248,11 @@ class NDPCandidate(scrapy.Item):
 
 
 class PPCCandidate(scrapy.Item):
-    name = scrapy.Field()
-    riding = scrapy.Field()
-    website = scrapy.Field()
-    facebook = scrapy.Field()
-    twitter = scrapy.Field()
+    name = scrapy.Field(output_processor=TakeFirst())
+    riding = scrapy.Field(output_processor=TakeFirst())
+    website = scrapy.Field(output_processor=TakeFirst())
+    facebook = scrapy.Field(output_processor=TakeFirst())
+    twitter = scrapy.Field(output_processor=TakeFirst())
 
 
 def clean_gpc_ed_code(value: str) -> str:
