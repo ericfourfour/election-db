@@ -180,21 +180,28 @@ def parse_bq_email(value: str) -> str:
 
 class BQCandidate(scrapy.Item):
     name = scrapy.Field(
-        input_processor=TakeFirst(), output_processor=MapCompose(parse_bq_name)
+        input_processor=MapCompose(parse_bq_name), output_processor=TakeFirst()
     )
     riding = scrapy.Field(
-        input_processor=TakeFirst(), output_processor=MapCompose(parse_bq_riding)
+        input_processor=MapCompose(parse_bq_riding), output_processor=TakeFirst()
     )
-    photo = scrapy.Field(input_processor=MapCompose(prepend_bq_photo))
-    website = scrapy.Field()
-    facebook = scrapy.Field()
-    instagram = scrapy.Field()
-    twitter = scrapy.Field()
+    photo = scrapy.Field(
+        input_processor=MapCompose(prepend_bq_photo), output_processor=TakeFirst()
+    )
+    website = scrapy.Field(output_processor=TakeFirst())
+    facebook = scrapy.Field(output_processor=TakeFirst())
+    instagram = scrapy.Field(output_processor=TakeFirst())
+    twitter = scrapy.Field(output_processor=TakeFirst())
     phone = scrapy.Field(
-        input_processor=MapCompose(strip_remove_blanks, parse_bq_phone, clean_phone)
+        input_processor=MapCompose(strip_remove_blanks, parse_bq_phone, clean_phone),
+        output_processor=TakeFirst(),
     )
-    email = scrapy.Field(input_processor=MapCompose(parse_bq_email))
-    bio = scrapy.Field(input_processor=MapCompose(strip_remove_blanks))
+    email = scrapy.Field(
+        input_processor=MapCompose(parse_bq_email), output_processor=TakeFirst()
+    )
+    bio = scrapy.Field(
+        input_processor=MapCompose(strip_remove_blanks), output_processor=Join("\n")
+    )
 
 
 def clean_ndp_name(value: str) -> str:

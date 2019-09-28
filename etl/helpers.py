@@ -95,25 +95,31 @@ class DownloadEncodeTask(luigi.Task):
 class LookupEDCodes(luigi.Task):
     src_pth = luigi.Parameter()
     dst_pth = luigi.Parameter()
+    lang = luigi.Parameter(default="EN")
 
     connection_string = "sqlite:///data/db/election.db"
 
     def run(self):
+        def simplify_riding(riding: str) -> str:
+            riding = riding.replace("œ", "oe").replace("Œ", "OE")
+            riding = re.sub(r"[^A-Za-z]+", "", riding)
+            riding = riding.lower()
+            return riding
+
         mk_parent_dirs(self.dst_pth)
 
         with sqlite3.connect(self.connection_string.replace("sqlite:///", "")) as db:
             districts = pd.read_sql_query("SELECT * FROM electoral_districts", db)
 
-        districts["riding"] = districts["ed_namee"].apply(
-            lambda x: re.sub(r"[^A-Za-z]+", "", x).lower()
-        )
+        if self.lang == "EN":
+            districts["riding"] = districts["ed_namee"].apply(simplify_riding)
+        elif self.lang == "FR":
+            districts["riding"] = districts["ed_namef"].apply(simplify_riding)
         districts.set_index("riding", inplace=True)
         districts = districts[["ed_code"]].astype("str")
 
         candidates = pd.read_json(self.src_pth)
-        candidates["riding"] = candidates["riding"].apply(
-            lambda x: re.sub(r"[^A-Za-z]+", "", x).lower()
-        )
+        candidates["riding"] = candidates["riding"].apply(simplify_riding)
         candidates.set_index("riding", inplace=True)
 
         candidates = candidates.join(districts)
