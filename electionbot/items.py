@@ -137,7 +137,7 @@ def parse_bq_riding(value: str) -> str:
 
 
 def prepend_bq_photo(value: str) -> str:
-    return f"http://www.blocquebecois.org/candidats{value}"
+    return f"http://www.blocquebecois.org{value}"
 
 
 def parse_bq_phone(value: str) -> str:
@@ -165,3 +165,26 @@ class BQCandidate(scrapy.Item):
     )
     email = scrapy.Field(input_processor=MapCompose(parse_bq_email))
     bio = scrapy.Field(input_processor=MapCompose(strip_remove_blanks))
+
+
+def clean_ndp_name(value: str) -> str:
+    return value.strip().replace("  ", " ")
+
+
+def prepend_ndp_link(value: str) -> str:
+    return f"https://www.ndp.ca{value}"
+
+
+class NDPCandidate(scrapy.Item):
+    name = scrapy.Field(input_processor=MapCompose(clean_ndp_name))
+    ed_code = scrapy.Field()
+    cabinet_position = scrapy.Field()
+    photo = scrapy.Field()
+    donate = scrapy.Field(input_processor=MapCompose(prepend_ndp_link))
+    lawnsign = scrapy.Field(input_processor=MapCompose(prepend_ndp_link))
+    volunteer = scrapy.Field()
+    website = scrapy.Field()
+    facebook = scrapy.Field()
+    instagram = scrapy.Field()
+    twitter = scrapy.Field()
+    bio = scrapy.Field()
