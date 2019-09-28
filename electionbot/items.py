@@ -148,7 +148,7 @@ def parse_bq_email(value: str) -> str:
     return value.replace("%", "@").replace("!", ".")
 
 
-class BQCandidates(scrapy.Item):
+class BQCandidate(scrapy.Item):
     name = scrapy.Field(
         input_processor=TakeFirst(), output_processor=MapCompose(parse_bq_name)
     )

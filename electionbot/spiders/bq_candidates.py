@@ -21,7 +21,7 @@ class BQCandidateSpider(scrapy.Spider):
 
     def parse(self, response):
         for sel in response.xpath("//div[contains(@class, 'candidates')]//article"):
-            l = ItemLoader(item=ei.BQCandidates(), selector=sel)
+            l = ItemLoader(item=ei.BQCandidate(), selector=sel)
 
             name = l.add_xpath("name", ".//div[@class='infos']//a[1]/@title")
             riding = l.add_xpath("riding", ".//div[@class='infos']//a[1]/@title")
