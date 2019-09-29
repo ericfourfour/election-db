@@ -270,14 +270,27 @@ def clean_gpc_email(value: str) -> str:
 
 
 class GPCCandidate(scrapy.Item):
-    name = scrapy.Field()
-    ed_code = scrapy.Field(input_processor=MapCompose(clean_gpc_ed_code))
-    photo = scrapy.Field()
-    volunteer = scrapy.Field(input_processor=MapCompose(prepend_gpc_link))
-    donate = scrapy.Field(input_processor=MapCompose(prepend_gpc_link))
-    facebook = scrapy.Field()
-    instagram = scrapy.Field()
-    twitter = scrapy.Field()
-    email = scrapy.Field(input_processor=MapCompose(clean_mailto))
-    phone = scrapy.Field(input_processor=MapCompose(clean_phone))
-    bio = scrapy.Field(input_processor=MapCompose(strip_remove_blanks))
+    name = scrapy.Field(output_processor=TakeFirst())
+    ed_code = scrapy.Field(
+        input_processor=MapCompose(clean_gpc_ed_code), output_processor=TakeFirst()
+    )
+    photo = scrapy.Field(output_processor=TakeFirst())
+    volunteer = scrapy.Field(
+        input_processor=MapCompose(prepend_gpc_link), output_processor=TakeFirst()
+    )
+    donate = scrapy.Field(
+        input_processor=MapCompose(prepend_gpc_link), output_processor=TakeFirst()
+    )
+    facebook = scrapy.Field(output_processor=TakeFirst())
+    instagram = scrapy.Field(output_processor=TakeFirst())
+    twitter = scrapy.Field(output_processor=TakeFirst())
+    email = scrapy.Field(
+        input_processor=MapCompose(clean_mailto), output_processor=TakeFirst()
+    )
+    phone = scrapy.Field(
+        input_processor=MapCompose(clean_phone), output_processor=TakeFirst()
+    )
+    bio = scrapy.Field(
+        input_processor=MapCompose(strip_remove_blanks), output_processor=Join("\n")
+    )
+
