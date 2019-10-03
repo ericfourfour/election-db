@@ -2,6 +2,8 @@ import etl.helpers as hlp
 import json
 import luigi
 
+from etl.districts import LoadDistricts
+from etl.parties import LoadParties
 from luigi.contrib import sqla
 
 
@@ -10,11 +12,21 @@ class LoadBQCandidates(sqla.CopyToTable):
     ed_pth = "data/bq_candidates_ed.json"
 
     reflect = True
-    connection_string = "sqlite:///data/db/election.db"
+    connection_string = luigi.Parameter(default="sqlite:///election.db")
     table = "candidates"
 
     def requires(self):
-        return hlp.LookupEDCodes(src_pth=self.src_pth, dst_pth=self.ed_pth, lang="FR")
+        return [
+            LoadDistricts(connection_string=self.connection_string),
+            LoadParties(connection_string=self.connection_string),
+            hlp.LookupEDCodes(
+                connection_string=self.connection_string,
+                src_pth=self.src_pth,
+                dst_pth=self.ed_pth,
+                spider="bq-candidate-spider",
+                lang="FR",
+            ),
+        ]
 
     def rows(self):
         with open(self.ed_pth, newline="", encoding="utf-8") as json_file:

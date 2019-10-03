@@ -1,6 +1,9 @@
+import etl.helpers as hlp
 import json
 import luigi
 
+from etl.districts import LoadDistricts
+from etl.parties import LoadParties
 from luigi.contrib import sqla
 
 
@@ -8,8 +11,15 @@ class LoadLPCCandidates(sqla.CopyToTable):
     src_pth = "data/lpc_candidates.json"
 
     reflect = True
-    connection_string = "sqlite:///data/db/election.db"
+    connection_string = luigi.Parameter(default="sqlite:///election.db")
     table = "candidates"
+
+    def requires(self):
+        return [
+            LoadDistricts(connection_string=self.connection_string),
+            LoadParties(connection_string=self.connection_string),
+            hlp.RunSpider(spider="lpc-candidate-spider", dst_pth=self.src_pth),
+        ]
 
     def rows(self):
         with open(self.src_pth, newline="", encoding="utf-8") as json_file:

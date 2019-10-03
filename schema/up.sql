@@ -3,7 +3,7 @@ CREATE TABLE electoral_districts (
     , ed_namee TEXT
     , ed_namef TEXT
     , population INTEGER
-);
+) WITHOUT ROWID;
 
 CREATE TABLE parties (
       title TEXT PRIMARY KEY
@@ -39,4 +39,6 @@ CREATE TABLE candidates (
 	, PRIMARY KEY (ed_code, party_title)
 	, FOREIGN KEY (ed_code) REFERENCES electoral_districts(ed_code)
 	, FOREIGN KEY (party_title) REFERENCES parties(title)
-);
+) WITHOUT ROWID;
+
+PRAGMA foreign_keys = ON;

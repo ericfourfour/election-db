@@ -7,7 +7,10 @@ import pathlib
 import re
 import shutil
 import sqlite3
+import subprocess
 import urllib
+
+from etl.districts import LoadDistricts
 
 
 def try_get_first(d: dict, key: str):
@@ -43,7 +46,7 @@ class EncodeFileTask(luigi.Task):
     dst_pth = luigi.Parameter()
     src_enc = luigi.Parameter()
     dst_enc = luigi.Parameter()
-    block_size = luigi.IntParameter(default=1048576)
+    block_size = luigi.IntParameter(default=1_048_576)
 
     def run(self):
         mk_parent_dirs(self.dst_pth)
@@ -66,7 +69,7 @@ class DownloadEncodeTask(luigi.Task):
 
     src_enc = luigi.Parameter()
     dst_enc = luigi.Parameter()
-    block_size = luigi.IntParameter(default=1048576)
+    block_size = luigi.IntParameter(default=1_048_576)
 
     @property
     def tmp_pth(self):
@@ -92,12 +95,36 @@ class DownloadEncodeTask(luigi.Task):
         return luigi.LocalTarget(self.dst_pth)
 
 
+class RunSpider(luigi.Task):
+    spider = luigi.Parameter()
+    dst_pth = luigi.Parameter()
+
+    def run(self):
+        cmd = ["scrapy", "crawl", self.spider, "-t", "json", "--nolog", "-o", "-"]
+        with open(self.dst_pth, "w", encoding="utf-8") as out_f:
+            p = subprocess.Popen(cmd, stdout=out_f)
+            p.wait()
+
+    def output(self):
+        return luigi.LocalTarget(path=self.dst_pth)
+
+    def complete(self):
+        return os.path.exists(self.dst_pth) and os.stat(self.dst_pth).st_size > 0
+
+
 class LookupEDCodes(luigi.Task):
     src_pth = luigi.Parameter()
     dst_pth = luigi.Parameter()
+    spider = luigi.Parameter()
     lang = luigi.Parameter(default="EN")
 
-    connection_string = "sqlite:///data/db/election.db"
+    connection_string = luigi.Parameter(default="sqlite:///election.db")
+
+    def requires(self):
+        return [
+            LoadDistricts(connection_string=self.connection_string),
+            RunSpider(spider=self.spider, dst_pth=self.src_pth),
+        ]
 
     def run(self):
         def simplify_riding(riding: str) -> str:
@@ -131,3 +158,4 @@ class LookupEDCodes(luigi.Task):
             return False
         candidates = pd.read_json(self.dst_pth)
         return "ed_code" in candidates.columns
+
