@@ -109,7 +109,9 @@ class RunSpider(luigi.Task):
         return luigi.LocalTarget(path=self.dst_pth)
 
     def complete(self):
-        return os.path.exists(self.dst_pth) and os.stat(self.dst_pth).st_size > 0
+        if not os.path.exists(self.dst_pth):
+            return False
+        return os.stat(self.dst_pth).st_size > 0
 
 
 class LookupEDCodes(luigi.Task):
