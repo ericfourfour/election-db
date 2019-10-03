@@ -5,3 +5,4 @@ data/
 items.json
 lpc_candidates.json
 cpc_candidates.json
+*.db
